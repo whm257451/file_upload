@@ -39,8 +39,9 @@ jobs:
       - name: Run real PaddleOCR inference
         env:
           PADDLE_PDX_MODEL_SOURCE: BOS
-          FLAGS_use_mkldnn: '1'
-          OMP_NUM_THREADS: '4'
+          PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True'
+          FLAGS_use_mkldnn: '0'
+          OMP_NUM_THREADS: '1'
         run: |
           python paddleocr_handwriting_yellow.py \
             inputs/handwriting_1.jpg inputs/handwriting_2.jpg \
@@ -52,6 +53,7 @@ jobs:
             2>&1 | tee inference.log
           sha256sum real_results/* > output-sha256.txt
       - name: Upload real results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: paddleocr-real-results
@@ -62,5 +64,5 @@ jobs:
             input-sha256.txt
             output-sha256.txt
             inference.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
