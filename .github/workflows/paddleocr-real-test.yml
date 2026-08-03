@@ -43,6 +43,18 @@ jobs:
             'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/4a5875abcfab4e8da156fce2b10b5c39.jpg' \
             -o inputs/handwriting_2.jpg
           sha256sum inputs/*.jpg > input-sha256.txt
+      - name: Disable unsupported CPU graph optimizations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('paddleocr_v2_handwriting.py')
+          s = p.read_text(encoding='utf-8')
+          old = 'engine = PaddleOCR(use_angle_cls=False, lang="ch", use_gpu=False, show_log=True)'
+          new = 'engine = PaddleOCR(use_angle_cls=False, lang="ch", use_gpu=False, show_log=True, ir_optim=False, enable_mkldnn=False, cpu_threads=1)'
+          if old not in s:
+              raise SystemExit('PaddleOCR constructor marker not found')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
       - name: Run real PaddleOCR inference
         env:
           FLAGS_use_mkldnn: '0'
