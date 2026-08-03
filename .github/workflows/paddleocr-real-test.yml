@@ -37,28 +37,21 @@ jobs:
             'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/4a5875abcfab4e8da156fce2b10b5c39.jpg' \
             -o inputs/handwriting_2.jpg
           sha256sum inputs/*.jpg > input-sha256.txt
-      - name: Run real PaddleOCR inference
+      - name: Run PP-OCRv6 high recall probe
         env:
           PADDLE_PDX_MODEL_SOURCE: BOS
-          FLAGS_use_mkldnn: '1'
-          OMP_NUM_THREADS: '4'
+          FLAGS_use_mkldnn: '0'
+          OMP_NUM_THREADS: '2'
         run: |
-          python paddleocr_handwriting_yellow.py \
-            inputs/handwriting_1.jpg inputs/handwriting_2.jpg \
-            --output-dir real_results \
-            --tile-size 1400 \
-            --overlap 160 \
-            --min-confidence 0.30 \
-            --handwriting-threshold 0.38 \
-            2>&1 | tee inference.log
-          sha256sum real_results/* > output-sha256.txt
-      - name: Upload real results
+          python probe_v6.py inputs/handwriting_1.jpg inputs/handwriting_2.jpg -o probe_results 2>&1 | tee inference.log
+          sha256sum probe_results/* > output-sha256.txt
+      - name: Upload probe results
         uses: actions/upload-artifact@v4
         with:
-          name: paddleocr-real-results
+          name: paddleocr-v6-probe
           path: |
-            real_results/
-            paddleocr_handwriting_yellow.py
+            probe_results/
+            probe_v6.py
             requirements-lock.txt
             input-sha256.txt
             output-sha256.txt
