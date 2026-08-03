@@ -1,1 +1,2 @@
 Trigger a pull-request workflow run for the two PaddleOCR handwriting sample images.
+Retry 2 after removing setup-python cache configuration.
