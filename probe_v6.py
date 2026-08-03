@@ -29,11 +29,11 @@ def tiles(im,size=960,overlap=128):
  for y in ys:
   for x in xs: yield im[y:min(y+size,h),x:min(x+size,w)],x,y
 def iou(a,b):
- x1=max(a[0],b[0]);y1=max(a[1],b[1]);x2=min(a[2],b[2]);y2=min(a[3],b[3]); inter=max(0,x2-x1)*max(0,y2-y1);aa=max(0,a[2]-a[0])*max(0,a[3]-a[1]);bb=max(0,b[2]-b[0])*max(0,b[3]-b[1]);return inter/max(aa+bb-inter,1e-6)
+ x1=max(a[0],b[0]);y1=max(a[1],b[1]);x2=min(a[2],b[2]);y2=min(a[3],b[3]);inter=max(0,x2-x1)*max(0,y2-y1);aa=max(0,a[2]-a[0])*max(0,a[3]-a[1]);bb=max(0,b[2]-b[0])*max(0,b[3]-b[1]);return inter/max(aa+bb-inter,1e-6)
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('images',nargs='+',type=Path);ap.add_argument('-o','--output',type=Path,default=Path('probe_results'));a=ap.parse_args();a.output.mkdir(parents=True,exist_ok=True)
  from paddleocr import PaddleOCR
- ocr=PaddleOCR(text_detection_model_name=DET_MODEL,text_recognition_model_name=REC_MODEL,use_doc_orientation_classify=False,use_doc_unwarping=False,use_textline_orientation=False,device='cpu',engine='paddle')
+ ocr=PaddleOCR(text_detection_model_name=DET_MODEL,text_recognition_model_name=REC_MODEL,use_doc_orientation_classify=False,use_doc_unwarping=False,use_textline_orientation=False,device='cpu',engine='onnxruntime')
  summary=[]
  for p in a.images:
   im=read_img(p);found=[]
@@ -49,7 +49,7 @@ def main():
   kept=[]
   for x in sorted(found,key=lambda z:z['confidence'],reverse=True):
    if not any(iou(x['bbox'],y['bbox'])>.55 for y in kept):kept.append(x)
-  kept.sort(key=lambda z:(z['bbox'][1],z['bbox'][0]));out={'input':str(p),'size':[im.shape[1],im.shape[0]],'models':[DET_MODEL,REC_MODEL],'count':len(kept),'items':kept}
+  kept.sort(key=lambda z:(z['bbox'][1],z['bbox'][0]));out={'input':str(p),'size':[im.shape[1],im.shape[0]],'models':[DET_MODEL,REC_MODEL],'engine':'onnxruntime','parameters':{'tile_size':960,'overlap':128,'text_det_limit_side_len':1280,'text_det_thresh':.15,'text_det_box_thresh':.25,'text_det_unclip_ratio':1.6,'text_rec_score_thresh':0.0},'count':len(kept),'items':kept}
   (a.output/f'{p.stem}_v6_raw.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8');vis=im.copy()
   for x in kept:cv2.polylines(vis,[np.rint(np.asarray(x['polygon'])).astype(np.int32)],True,(0,255,255),2,cv2.LINE_AA)
   ok,b=cv2.imencode('.jpg',vis,[cv2.IMWRITE_JPEG_QUALITY,94]);b.tofile(str(a.output/f'{p.stem}_v6_all.jpg'));summary.append({'image':str(p),'count':len(kept)});print(p,len(kept))
