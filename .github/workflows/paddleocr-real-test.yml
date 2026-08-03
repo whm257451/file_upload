@@ -16,16 +16,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.10'
       - name: Install pinned PaddleOCR environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install \
-            paddlepaddle==3.3.1 \
-            paddleocr==3.7.0 \
-            opencv-python-headless==4.12.0.88 \
-            numpy==2.2.6
+            paddlepaddle==2.6.2 \
+            paddleocr==2.7.3 \
+            numpy==1.26.4 \
+            opencv-python-headless==4.9.0.80
           python -m pip freeze | sort > requirements-lock.txt
+          python - <<'PY'
+          import cv2, numpy, paddle, paddleocr
+          print('paddle=', paddle.__version__)
+          print('paddleocr=', getattr(paddleocr, '__version__', 'unknown'))
+          print('opencv=', cv2.__version__)
+          print('numpy=', numpy.__version__)
+          PY
       - name: Download the two original samples
         run: |
           mkdir -p inputs
@@ -38,12 +45,10 @@ jobs:
           sha256sum inputs/*.jpg > input-sha256.txt
       - name: Run real PaddleOCR inference
         env:
-          PADDLE_PDX_MODEL_SOURCE: BOS
-          PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True'
           FLAGS_use_mkldnn: '0'
           OMP_NUM_THREADS: '1'
         run: |
-          python paddleocr_handwriting_yellow.py \
+          python paddleocr_v2_handwriting.py \
             inputs/handwriting_1.jpg inputs/handwriting_2.jpg \
             --output-dir real_results \
             --tile-size 1400 \
@@ -56,10 +61,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paddleocr-real-results
+          name: paddleocr-v2-real-results
           path: |
             real_results/
-            paddleocr_handwriting_yellow.py
+            paddleocr_v2_handwriting.py
             requirements-lock.txt
             input-sha256.txt
             output-sha256.txt
