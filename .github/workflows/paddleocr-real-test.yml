@@ -1,6 +1,8 @@
 name: PaddleOCR real image test
 
 on:
+  push:
+    branches: [paddleocr-real-test-20260803]
   pull_request:
     branches: [main]
   workflow_dispatch:
