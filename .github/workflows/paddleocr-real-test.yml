@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   ocr:
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -18,34 +18,23 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install pinned PaddleOCR environment
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install \
-            paddlepaddle==2.6.2 \
-            paddleocr==2.7.3 \
-            numpy==1.26.4 \
-            opencv-python-headless==4.9.0.80
-          python -m pip freeze | sort > requirements-lock.txt
-          python - <<'PY'
-          import cv2, numpy, paddle, paddleocr
-          print('paddle=', paddle.__version__)
-          print('paddleocr=', getattr(paddleocr, '__version__', 'unknown'))
-          print('opencv=', cv2.__version__)
-          print('numpy=', numpy.__version__)
-          PY
+          python -m pip install paddlepaddle==2.6.2 paddleocr==2.7.3 numpy==1.26.4 protobuf==3.20.2
+          python -m pip freeze | Sort-Object | Set-Content requirements-lock.txt
+          python -c "import cv2,numpy,paddle,paddleocr; print('paddle=',paddle.__version__); print('paddleocr=',getattr(paddleocr,'__version__','unknown')); print('opencv=',cv2.__version__); print('numpy=',numpy.__version__)"
       - name: Download the two original samples
+        shell: pwsh
         run: |
-          mkdir -p inputs
-          curl --fail --location --retry 5 \
-            'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/f3227eb81a9d4d54bffeec1b12bf3c8f.jpg' \
-            -o inputs/handwriting_1.jpg
-          curl --fail --location --retry 5 \
-            'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/4a5875abcfab4e8da156fce2b10b5c39.jpg' \
-            -o inputs/handwriting_2.jpg
-          sha256sum inputs/*.jpg > input-sha256.txt
-      - name: Disable unsupported CPU graph optimizations
+          New-Item -ItemType Directory -Force inputs | Out-Null
+          Invoke-WebRequest -Uri 'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/f3227eb81a9d4d54bffeec1b12bf3c8f.jpg' -OutFile 'inputs/handwriting_1.jpg'
+          Invoke-WebRequest -Uri 'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/4a5875abcfab4e8da156fce2b10b5c39.jpg' -OutFile 'inputs/handwriting_2.jpg'
+          Get-FileHash inputs/*.jpg -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content input-sha256.txt
+      - name: Disable unsupported graph optimizations
+        shell: pwsh
         run: |
-          python - <<'PY'
+          @'
           from pathlib import Path
           p = Path('paddleocr_v2_handwriting.py')
           s = p.read_text(encoding='utf-8')
@@ -54,26 +43,21 @@ jobs:
           if old not in s:
               raise SystemExit('PaddleOCR constructor marker not found')
           p.write_text(s.replace(old, new), encoding='utf-8')
-          PY
+          '@ | python -
       - name: Run real PaddleOCR inference
+        shell: pwsh
         env:
           FLAGS_use_mkldnn: '0'
           OMP_NUM_THREADS: '1'
         run: |
-          python paddleocr_v2_handwriting.py \
-            inputs/handwriting_1.jpg inputs/handwriting_2.jpg \
-            --output-dir real_results \
-            --tile-size 1400 \
-            --overlap 160 \
-            --min-confidence 0.30 \
-            --handwriting-threshold 0.38 \
-            2>&1 | tee inference.log
-          sha256sum real_results/* > output-sha256.txt
+          python paddleocr_v2_handwriting.py inputs/handwriting_1.jpg inputs/handwriting_2.jpg --output-dir real_results --tile-size 1400 --overlap 160 --min-confidence 0.30 --handwriting-threshold 0.38 2>&1 | Tee-Object -FilePath inference.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-FileHash real_results/* -Algorithm SHA256 | Format-Table -AutoSize | Out-String | Set-Content output-sha256.txt
       - name: Upload real results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paddleocr-v2-real-results
+          name: paddleocr-windows-real-results
           path: |
             real_results/
             paddleocr_v2_handwriting.py
