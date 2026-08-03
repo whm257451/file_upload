@@ -1,0 +1,49 @@
+name: PaddleOCR v2 validation
+on:
+  push:
+    branches: [paddleocr-v2-20260803]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install paddlepaddle==3.3.1 paddleocr==3.7.0 onnxruntime==1.23.2 opencv-python-headless==4.12.0.88 numpy==2.2.6
+          python -m pip freeze | sort > requirements-lock.txt
+      - name: Download samples
+        run: |
+          mkdir -p inputs
+          curl --fail --location --retry 5 'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/f3227eb81a9d4d54bffeec1b12bf3c8f.jpg' -o inputs/handwriting_1.jpg
+          curl --fail --location --retry 5 'http://s3-cn-sh2.ufileos.com/zn-zuoye/2026/08/03/4a5875abcfab4e8da156fce2b10b5c39.jpg' -o inputs/handwriting_2.jpg
+          sha256sum inputs/*.jpg > input-sha256.txt
+      - name: Run probe
+        env:
+          PADDLE_PDX_MODEL_SOURCE: BOS
+          PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True'
+          OMP_NUM_THREADS: '2'
+        run: |
+          python probe_v6.py inputs/handwriting_1.jpg inputs/handwriting_2.jpg -o probe_results 2>&1 | tee inference.log
+          sha256sum probe_results/* > output-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paddleocr-v6-probe
+          path: |
+            probe_results/
+            probe_v6.py
+            requirements-lock.txt
+            input-sha256.txt
+            output-sha256.txt
+            inference.log
+          if-no-files-found: error
+          retention-days: 7
