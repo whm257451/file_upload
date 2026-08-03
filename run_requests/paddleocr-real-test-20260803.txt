@@ -1,3 +1,4 @@
 Trigger a pull-request workflow run for the two PaddleOCR handwriting sample images.
 Retry 2 after removing setup-python cache configuration.
 Retry 3 with oneDNN disabled for deterministic CPU inference.
+Retry 4 with Python 3.10, PaddlePaddle 2.6.2 and PaddleOCR 2.7.3.
